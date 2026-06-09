@@ -69,7 +69,9 @@ public class InstallCert {
         int numArg = 0;
         int nbArgs = args.length;
         boolean invalidArgs = false;
-        boolean isQuiet = false;
+        boolean doFirst = false;
+        boolean doAll = false;
+        boolean isVerbose = false;
         while (numArg < nbArgs) {
             String arg = args[numArg++];
             if (arg.startsWith("--proxy=")) {
@@ -79,8 +81,14 @@ public class InstallCert {
                 proxyHost = c[0];
                 proxyPort = Integer.parseInt(c[1]);  // proxy port is mandatory (we don't default to 8080)
             }
-            else if (arg.startsWith("--quiet")) {
-                isQuiet = true;
+            else if (arg.startsWith("--all")) {
+                doAll = true;
+            }
+            else if (arg.startsWith("--first")) {
+                doFirst = true;
+            }
+            else if (arg.startsWith("--verbose")) {
+                isVerbose = true;
             }
             else if (host == null) {  // 1st argument is the "host:port"
                 String[] c = arg.split(":");
@@ -100,7 +108,7 @@ public class InstallCert {
         }
 
         if (invalidArgs) {
-            System.out.println("Usage: java InstallCert [--proxy=proxyHost:proxyPort] host[:port] [passphrase] [--quiet]");
+            System.out.println("Usage: java InstallCert [--proxy=proxyHost:proxyPort] host[:port] [passphrase] [--all] [--first] [--verbose]");
             return;
         }
 
@@ -181,7 +189,13 @@ public class InstallCert {
         }
 
         int k;
-        if (isQuiet) {
+	if (doAll) {
+            for (int i = 0; i < chain.length; i++) {
+		add_cert(ks,host,passphrase,chain,i,isVerbose);
+	    }
+	    return;
+	}
+        else if (doFirst) {
             System.out.println("Adding first certificate to trusted keystore");
             k = 0;
         }
@@ -196,6 +210,13 @@ public class InstallCert {
             }
         }
 
+        add_cert(ks,host,passphrase,chain,k,isVerbose);
+    }
+
+    private static void add_cert(KeyStore ks, String host, char[] passphrase,
+		 X509Certificate[] chain, int k, boolean isVerbose)
+		throws Exception {
+
         X509Certificate cert = chain[k];
         String alias = host + "-" + (k + 1);
         ks.setCertificateEntry(alias, cert);
@@ -204,10 +225,12 @@ public class InstallCert {
         ks.store(out, passphrase);
         out.close();
 
+	if (isVerbose) {
+        	System.out.println();
+        	System.out.println(cert);
+        }
         System.out.println();
-        System.out.println(cert);
-        System.out.println();
-        System.out.println("Added certificate to keystore 'jssecacerts' using alias '" + alias + "'");
+        System.out.println("Added certificate "+(k+1)+" to keystore 'jssecacerts' using alias '" + alias + "'");
     }
 
     private static final char[] HEXDIGITS = "0123456789abcdef".toCharArray();
